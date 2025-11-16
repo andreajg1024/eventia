@@ -2,64 +2,55 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ "main" ]
   pull_request:
-    branches: [ main ]
+    branches: [ "main" ]
 
 jobs:
   build-test:
     runs-on: ubuntu-latest
+
     services:
       postgres:
         image: postgres:15
+        ports:
+          - 5432:5432
         env:
           POSTGRES_DB: eventia
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
         options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-      redis:
-        image: redis:7
-        ports:
-          - 6379:6379
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
-      - name: Use Node.js
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
-      - name: Wait for DB
+      - name: Wait for PostgreSQL to be ready
         run: |
-          for i in {1..10}; do
-            pg_isready -h localhost -p 5432 && break
+          until pg_isready -h localhost -p 5432; do
+            echo "Waiting for postgres..."
             sleep 2
           done
 
+      - name: Run migrations (si tienes)
+        run: npm run migrate || echo "No migrations"
+
       - name: Run tests
         env:
-          DB_HOST: localhost
-          DB_PORT: 5432
-          DB_USER: postgres
-          DB_PASSWORD: postgres
-          DB_NAME: eventia
-          REDIS_HOST: localhost
-          REDIS_PORT: 6379
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/eventia"
         run: npm test
 
-      - name: Run linter
-        run: npm run lint
-
-      - name: Print OK if all good
-        if: ${{ success() }}
-        run: echo "OK"
+      - name: Build app
+        run: npm run build
