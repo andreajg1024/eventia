@@ -37,6 +37,9 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Dar permisos a Jest
+        run: chmod +x node_modules/.bin/jest
+
       - name: Wait for PostgreSQL to be ready
         run: |
           until pg_isready -h localhost -p 5432; do
