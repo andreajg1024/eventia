@@ -13,47 +13,50 @@ jobs:
     services:
       postgres:
         image: postgres:15
-        ports:
-          - 5432:5432
         env:
           POSTGRES_DB: eventia
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
         options: > 
-          --health-cmd "pg_isready -U postgres" 
-          --health-interval 10s 
-          --health-timeout 5s 
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
           --health-retries 5
 
     steps:
+      # 1️⃣ Clonar el repositorio
       - name: Checkout repo
         uses: actions/checkout@v4
 
+      # 2️⃣ Configurar Node.js
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: 'npm'  # cachea node_modules automáticamente
 
+      # 3️⃣ Instalar dependencias
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
-      - name: Dar permisos a Jest
-        run: chmod +x node_modules/.bin/jest
-
-      - name: Wait for PostgreSQL to be ready
+      # 4️⃣ Esperar que PostgreSQL esté listo
+      - name: Wait for PostgreSQL
         run: |
-          until pg_isready -h localhost -p 5432; do
+          until pg_isready -h localhost -p 5432 -U postgres; do
             echo "Waiting for postgres..."
             sleep 2
           done
 
-      - name: Run migrations (si tienes)
+      # 5️⃣ Ejecutar migraciones (si tienes)
+      - name: Run migrations
         run: npm run migrate || echo "No migrations"
 
+      # 6️⃣ Ejecutar tests
       - name: Run tests
         env:
           DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/eventia"
         run: npm test
 
+      # 7️⃣ Construir la aplicación
       - name: Build app
         run: npm run build
